@@ -402,6 +402,7 @@ function updateTweens(dt) {
 // ---------- 게임 규칙 ----------
 // 베팅 20 기준으로 조정: 당첨률 43%, 기대 환수율 180%, 처음 100 → 200 도달 약 74% (사신 만남 약 26%, 시뮬레이션)
 const SYMS = {
+  ingot: { pay: 10000, emoji: '🪙' },
   rainbow: { pay: 500, emoji: '🌈' },
   trophy: { pay: 250, emoji: '🏆' },
   bag: { pay: 150, emoji: '💰' },
@@ -424,7 +425,8 @@ const DEATH_GOAL = 100000;                          // 숨겨진 트리거: 죽�
 // 죽음의 코인은 기계마다 마지막 릴에 하나. 걸리면 그 줄 당첨금의 3배를 잃음
 // (시뮬레이션 환수율: 중반 378% → 156%, 후반 611% → 121%, 끝판 950% → 186%)
 const DEATH_MUL = 3;
-const MILLION = 1000000;                            // 백만장자 엔딩
+const MILLION = 1000000;                            // 금괴 심볼 해금
+const BILLION = 1000000000;                         // 억만장자 엔딩
 const REAPER_FLIP_WIN = 0.6;                        // 사신과의 동전 던지기에서 플레이어가 이길 확률
 // 엔딩 보너스 (영구): 엔딩 1회마다 당첨금 +0.1배, 기본 행운 +1레벨 (최대 +3)
 const ENDING_KEY = 'lucky7-slots-endings';
@@ -440,7 +442,8 @@ const QUESTS = [
   { goal: 5000, text: '5,000 코인! 카지노 털기' },
   { goal: 20000, text: '20,000 코인! 큰손 등극' },
   { goal: DEATH_GOAL, text: '100,000 코인... 그다음은?' },
-  { goal: MILLION, text: '1,000,000 코인! 사신과의 마지막 승부' },
+  { goal: MILLION, text: '1,000,000 코인! 금괴를 찾아라' },
+  { goal: BILLION, text: '1,000,000,000 코인! 사신과의 마지막 승부' },
 ];
 const UPGRADES = [
   { id: 'machine', icon: '🎰', name: '슬롯머신 추가', desc: '레버 한 번에 양옆 기계도 같이 돌아가요. (베팅 × 기계 수, 최대 5대)', prices: [150, 400, 8000, 40000], tiers: [0, 1, 3, 4] },
@@ -455,6 +458,7 @@ const UPGRADES = [
   { id: 'bag', icon: '💰', name: '돈주머니 심볼', desc: '각 릴의 종 하나가 💰로! 💰💰💰 = ×150', prices: [1500], tiers: [2] },
   { id: 'trophy', icon: '🏆', name: '황금 트로피 심볼', desc: '각 릴의 레몬 하나가 🏆로! 🏆🏆🏆 = ×250', prices: [6000], tiers: [3] },
   { id: 'rainbow', icon: '🌈', name: '무지개 심볼', desc: '각 릴의 체리 하나가 🌈로! 🌈🌈🌈 = ×500', prices: [25000], tiers: [4] },
+  { id: 'ingot', icon: '🪙', name: '금괴 심볼', desc: '각 릴의 레몬 하나가 금괴로! 🪙🪙🪙 = ×10,000', prices: [300000], tiers: [6] },
   { id: 'wild', icon: '⭐', name: '와일드 심볼', desc: '가운데 릴의 BAR 하나가 ⭐WILD로! 어떤 그림이든 대신해요. (WILD로 맞춘 당첨은 배당 절반)', prices: [4000], tiers: [2] },
 ];
 const ACHIEVEMENTS = [
@@ -470,6 +474,7 @@ const ACHIEVEMENTS = [
   ['hit_bag', '💰', '돈방석', '💰💰💰 첫 당첨', 'rare'],
   ['hit_trophy', '🏆', '챔피언', '🏆🏆🏆 첫 당첨', 'rare'],
   ['hit_rainbow', '🌈', '무지개 너머', '🌈🌈🌈 첫 당첨', 'rare'],
+  ['hit_ingot', '🪙', '금괴 사냥꾼', '🪙🪙🪙 첫 당첨', 'rare'],
   ['streak2', '🔥', '2연속 당첨', '두 번 연속 당첨'],
   ['streak3', '🔥', '3연속 당첨', '세 번 연속 당첨'],
   ['streak4', '🌋', '4연속 당첨', '네 번 연속 당첨'],
@@ -494,7 +499,8 @@ const ACHIEVEMENTS = [
   ['death_hit', '☠️', '죽음의 맛', '죽음의 코인에 당첨금을 빼앗기기'],
   ['death_big', '🪦', '피눈물', '죽음의 코인으로 한 번에 10,000 이상 잃기', 'rare'],
   ['millionaire', '🤑', '백만장자', '1,000,000 코인 달성', 'rare'],
-  ['ending_lose', '💸', '백만장자의 최후', '마지막 승부에서 져서 영혼을 빼앗기기', 'rare'],
+  ['billionaire', '🏰', '억만장자', '1,000,000,000 코인 달성', 'rare'],
+  ['ending_lose', '💸', '억만장자의 최후', '마지막 승부에서 져서 영혼을 빼앗기기', 'rare'],
   ['ending_win', '🏥', '꿈이었나...', '마지막 승부에서 이기고 병원에서 깨어나기', 'rare'],
   ['allin_win', '💥', '인생은 한 방', 'ALL IN으로 당첨되기'],
   ['double_win', '😈', '악마와의 거래', '더블 오어 낫싱 성공'],
@@ -742,6 +748,15 @@ const ART = {
     for (const [px, c] of [[94, '#4de1ff'], [128, '#ff3b4e'], [162, '#3ddc84']]) blob(x, () => { x.beginPath(); x.arc(px, 135, 9, 0, TAU); }, c);
     shine(x, 96, 92, 5, 14, 0.4);
   },
+  ingot(x) {
+    // 금괴 세 개를 피라미드로 쌓기
+    const bar = (cx, cy) => {
+      blob(x, () => { x.beginPath(); x.moveTo(cx - 44, cy + 22); x.lineTo(cx - 30, cy - 18); x.lineTo(cx + 30, cy - 18); x.lineTo(cx + 44, cy + 22); x.closePath(); }, '#ffc93c');
+      blob(x, () => { x.beginPath(); x.moveTo(cx - 30, cy - 18); x.lineTo(cx - 22, cy - 30); x.lineTo(cx + 22, cy - 30); x.lineTo(cx + 30, cy - 18); x.closePath(); }, '#ffe58a');
+      shine(x, cx - 18, cy, 5, 12, 0.4);
+    };
+    bar(82, 140); bar(174, 140); bar(128, 88);
+  },
   wild(x) {
     blob(x, () => {
       x.beginPath();
@@ -833,6 +848,7 @@ function stripBase(reelIndex) {
   if (state.up.bag) s[s.indexOf('bell')] = 'bag';
   if (state.up.trophy) s[s.indexOf('lemon')] = 'trophy';
   if (state.up.rainbow) s[s.indexOf('cherry')] = 'rainbow';
+  if (state.up.ingot) s[s.indexOf('lemon')] = 'ingot';
   if (state.up.wild && reelIndex === 1) s[s.indexOf('bar')] = 'wild';
   if (state.cursed && reelIndex === 2) s[s.indexOf('cherry')] = 'death';
   return s;
@@ -1098,7 +1114,7 @@ const state = {
   credits: 100, bet: 1, win: 0, phase: 'idle', streak: 0, spins: 0, best: 100,
   lives: 1, met: false, revived: false, auto: false, autoT: 0,
   questIdx: 0, shopOpen: false, pulled: false, shake: 0,
-  up: { machine: 0, luck: 0, betcap: 0, cherry: 0, auto: 0, deal: 0, crown: 0, golden: 0, double: 0, wild: 0, bag: 0, trophy: 0, rainbow: 0 },
+  up: { machine: 0, luck: 0, betcap: 0, cherry: 0, auto: 0, deal: 0, crown: 0, golden: 0, double: 0, wild: 0, bag: 0, trophy: 0, rainbow: 0, ingot: 0 },
   cursed: false,
   allIn: false, prevBet: 1,
 };
@@ -1751,6 +1767,7 @@ function renderHUD() {
 }
 function renderPaytable() {
   const rows = [];
+  if (state.up.ingot) rows.push(['🪙🪙🪙', 10000]);
   if (state.up.rainbow) rows.push(['🌈🌈🌈', 500]);
   if (state.up.trophy) rows.push(['🏆🏆🏆', 250]);
   if (state.up.bag) rows.push(['💰💰💰', 150]);
@@ -1861,7 +1878,7 @@ setTimeout(() => {
 // ---------- 퀘스트 & 숨겨진 상점 ----------
 function checkQuest() {
   let completed = false;
-  while (state.questIdx < QUESTS.length - 2 && state.credits >= QUESTS[state.questIdx].goal) {
+  while (state.questIdx < QUESTS.length - 1 && QUESTS[state.questIdx].goal !== DEATH_GOAL && state.credits >= QUESTS[state.questIdx].goal) {
     state.questIdx++;
     completed = true;
   }
@@ -1934,7 +1951,7 @@ $('cards').addEventListener('click', (e) => {
   renderPaytable();
 });
 // 심볼 업그레이드: 어떤 심볼을 바꾸는지 (와일드는 가운데 릴만)
-const SYMBOL_UPGRADES = { crown: 'lemon', bag: 'bell', trophy: 'lemon', rainbow: 'cherry', wild: 'bar' };
+const SYMBOL_UPGRADES = { crown: 'lemon', bag: 'bell', trophy: 'lemon', rainbow: 'cherry', ingot: 'lemon', wild: 'bar' };
 function applyUpgrade(id) {
   if (id === 'machine') {
     const m = new Machine(slotX(machines.length), false);
@@ -2161,8 +2178,9 @@ function toIdle() {
   state.phase = 'idle';
   renderHUD();
   if (state.credits >= 1000) unlock('rich');
+  if (state.credits >= MILLION) unlock('millionaire');
   if (!state.cursed && state.credits >= DEATH_GOAL) { deathCoinEvent(); return; }
-  if (state.cursed && state.credits >= MILLION) { millionaireEnding(); return; }
+  if (state.cursed && state.credits >= BILLION) { billionaireEnding(); return; }
   if (checkQuest()) return;
   if (state.credits <= 0) setTimeout(reaperEncounter, 700);
   else if (state.up.double && state.win > 0 && !state.auto) offerDouble(state.win);
@@ -2227,13 +2245,13 @@ async function deathCoinEvent() {
   sfx.stopDrone();
   setDark(false);
   cam.mode = 'normal';
-  state.questIdx = QUESTS.length - 1;
+  state.questIdx = QUESTS.length - 2;   // 백만 퀘스트
   state.phase = 'idle';
   renderHUD();
   toast('💀 모든 슬롯의 마지막 릴에 죽음의 코인이 들어갔어요');
 }
 
-// ---------- 백만장자 엔딩 ----------
+// ---------- 억만장자 엔딩 ----------
 function endingBonusText() {
   const n = ENDINGS + 1;
   return `🏁 엔딩 보너스 (다음 판부터): 당첨금 ×${(1 + 0.1 * n).toFixed(1)} · 행운 +${Math.min(3, n)} · 마지막 승부 승률 ${Math.round(Math.min(0.95, 0.6 + 0.1 * n) * 100)}%`;
@@ -2241,21 +2259,21 @@ function endingBonusText() {
 function recordEnding() {
   try { localStorage.setItem(ENDING_KEY, String(ENDINGS + 1)); } catch { /* 저장소 없음 */ }
 }
-async function millionaireEnding() {
+async function billionaireEnding() {
   state.phase = 'reaper';
   state.auto = false;
   updateAutoBtn();
   hideDouble();
-  unlock('millionaire');
+  unlock('billionaire');
   sfx.startDrone();
   setDark(true);
   cam.mode = 'reaper';
   await wait(0.6);
   await reaperAppear();
   RA.mood = ENDINGS ? 'grumble' : 'shock';
-  await say(ENDINGS ? '...또 너냐.\n이번엔 절대 안 진다.' : '배... 백만 코인이라고?', 2.0);
+  await say(ENDINGS ? '...또 너냐.\n이번엔 절대 안 진다.' : '시... 십억 코인이라고?', 2.0);
   RA.mood = 'smug';
-  await say('좋다. 마지막 승부다.\n네 백만 코인과 영혼을 걸어라.', 3.0);
+  await say('좋다. 마지막 승부다.\n네 십억 코인과 영혼을 걸어라.', 3.0);
   await say('이번이 진짜 마지막이다.\n앞이냐, 뒤냐?');
   const guess = await askCoin();
   await say(guess === 'heads' ? '앞면이라... 어디 보자.' : '뒷면이라... 어디 보자.');
@@ -2279,7 +2297,7 @@ async function millionaireEnding() {
   } else {
     unlock('ending_lose');
     reaperLaugh();
-    await say('크하하하!\n백만 코인도, 네 영혼도 내 것이다!', 2.4);
+    await say('크하하하!\n십억 코인도, 네 영혼도 내 것이다!', 2.4);
     await deathSequence(true);
   }
 }
@@ -2734,7 +2752,7 @@ async function deathSequence(final = false) {
   sfx.stopDrone();
   $('deathStats').textContent = `최고 크레딧 ${state.best.toLocaleString()} · ${state.spins}번 돌림 · 퀘스트 ${state.questIdx}/${QUESTS.length} · 지금까지 ${restarts}번 다시 시작`;
   if (final) {
-    $('deathMsg').textContent = '💸 백만장자의 최후… 백만 코인도, 영혼도 사신의 것이 되었다.';
+    $('deathMsg').textContent = '💸 억만장자의 최후… 십억 코인도, 영혼도 사신의 것이 되었다.';
     $('deathBonus').textContent = endingBonusText();
     $('restart').textContent = '다시 하기 ↻';
   }
