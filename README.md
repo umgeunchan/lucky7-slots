@@ -1,5 +1,8 @@
 # Lucky 7 Slots
 
+https://umgeunchan.github.io/lucky7-slots/
+바로 플레이
+
 Three.js로 만든 카툰 3D 슬롯머신 게임입니다. 빌드 없이 `index.html` 하나로 동작합니다.
 
 ## 실행
